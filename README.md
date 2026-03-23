@@ -2260,7 +2260,7 @@ function startFight() {
   const maxHP = getPlayerMaxHP();
   const maxSta = getPlayerMaxStamina();
   const f = state.fight;
-  f.playerHP = maxHP; f.playerMaxHP = maxHP;
+  f.playerHP = Math.floor(maxHP); f.playerMaxHP = Math.floor(maxHP);
   // Stormbringer always starts at full stamina
   f.playerStamina = maxSta; f.playerMaxStamina = maxSta;
   f.blocking = false;
@@ -2412,7 +2412,7 @@ function enemyTurn() {
       : `💜 <span class="log-enemy">${currentEnemy.name} attacks for ${dmg}.</span>`, 'enemy');
     showDamage('player-card', `-${dmg}`, 'damage-enemy');
   }
-  f.playerHP = Math.max(0, f.playerHP - dmg);
+  f.playerHP = Math.floor(Math.max(0, f.playerHP - dmg));
   const monsterAnim = enemyCrit ? 'attack-monster-crit' : 'attack-monster';
   animateCard('enemy-card', monsterAnim, 750);
   setTimeout(() => {
@@ -2482,7 +2482,7 @@ function resetPlayerStats() {
   const f = state.fight;
   const maxHP  = getPlayerMaxHP();
   const maxSta = getPlayerMaxStamina();
-  f.playerHP           = maxHP;
+  f.playerHP           = Math.floor(maxHP);
   f.playerMaxHP        = maxHP;
   f.playerStamina      = maxSta;
   f.playerMaxStamina   = maxSta;
@@ -2518,7 +2518,7 @@ function updateBars() {
   const f = state.fight;
   const hpPct = Math.max(0, f.playerHP / f.playerMaxHP * 100);
   document.getElementById('player-hp-bar').style.width = hpPct + '%';
-  document.getElementById('player-hp-txt').textContent = `${Math.max(0,f.playerHP)} / ${f.playerMaxHP}`;
+  document.getElementById('player-hp-txt').textContent = `${Math.floor(Math.max(0,f.playerHP))} / ${Math.floor(f.playerMaxHP)}`;
   const staPct = Math.max(0, f.playerStamina / f.playerMaxStamina * 100);
   document.getElementById('player-sta-bar').style.width = staPct + '%';
   document.getElementById('player-sta-txt').textContent = `${Math.round(f.playerStamina)} / ${f.playerMaxStamina}`;
