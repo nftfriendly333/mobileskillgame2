@@ -2089,6 +2089,7 @@ const state = {
   skillClicks: { stamina:0, attack:0, defense:0, crit:0 },
   cdTimers: { stamina:null, attack:null, defense:null, crit:null },
   totalXP: 0,
+  lifetimeXP: 0,    // never decremented — only goes up
   enemiesDefeated: 0,
   wave: 1,
   fight: {
@@ -2448,7 +2449,8 @@ function playerWins() {
   else if (state.wave > 60) xpMultiplier *= 1.6;
   else if (state.wave > 40) xpMultiplier *= 1.3;
   const xpGain = Math.round(currentEnemy.xpReward * xpMultiplier);
-  state.totalXP += xpGain;
+  state.totalXP    += xpGain;
+  state.lifetimeXP += xpGain;  // lifetime never decremented
   const penaltyTag = xpPenalty && state.wave <= 40 ? ' <span style="color:var(--text3);font-size:0.85em;">(-10%)</span>' : '';
   const bonusTag   = state.wave > 40 ? ` <span style="color:var(--green2);font-size:0.85em;">(x${xpMultiplier.toFixed(2)} bonus)</span>` : '';
   addLog(`☠ <span class="log-death">${currentEnemy.name} slain!</span>`, 'death');
@@ -3341,7 +3343,8 @@ async function claimGuildXP() {
     const snap = await window._fbGet(window._fbRef(window._fbDb, key));
     if (!snap.exists() || !snap.val()) return;
     const pending = snap.val();
-    state.totalXP += pending;
+    state.totalXP    += pending;
+    state.lifetimeXP += pending;
     await window._fbSet(window._fbRef(window._fbDb, key), 0);
     updateXPDisplay();
     showSaveToast(`+${pending.toLocaleString()} XP from your Guild!`, '#c9a84c');
@@ -3356,7 +3359,7 @@ async function claimGuildXP() {
 // ============================================================
 const LB_PREFIX  = 'lb:';          // shared key prefix
 const LB_MAX     = 100;            // max entries to store globally
-let   lbCurrentTab = 'enemies';
+let   lbCurrentTab = 'lifetime';
 let   lbMyKey = null;              // this player's storage key
 
 // Derive a stable player key from hero name + browser fingerprint
@@ -3384,6 +3387,8 @@ async function submitLeaderboardScore() {
     enemiesDefeated: state.enemiesDefeated,
     wave:            Math.max(1, state.wave - 1),
     totalXP:         state.totalXP,
+    lifetimeXP:      state.lifetimeXP,
+    lifetimeXP:      state.lifetimeXP,
     totalSkillLv,
     guildCode:       guildState.myGuildCode || null,
     wallet:          shopState.walletAddress || '',
@@ -3417,14 +3422,14 @@ async function fetchLeaderboardEntries() {
 }
 
 function sortLeaderboard(entries, tab) {
-  const field = { wave:'wave', xp:'totalXP' }[tab];
+  const field = { wave:'wave', lifetime:'lifetimeXP' }[tab];
   return [...entries].sort((a, b) => (b[field] || 0) - (a[field] || 0));
 }
 
 function renderLeaderboardTable(entries, tab) {
-  const field  = { wave:'wave', xp:'totalXP' }[tab];
-  const label  = { wave:'Highest Wave Reached', xp:'Total XP Earned' }[tab];
-  const fmt    = { wave: v => `Wave ${v}`, xp: v => `${v.toLocaleString()} XP` }[tab];
+  const field  = { wave:'wave', lifetime:'lifetimeXP' }[tab];
+  const label  = { wave:'Highest Wave Reached', lifetime:'Lifetime XP Earned' }[tab];
+  const fmt    = { wave: v => `Wave ${v}`, lifetime: v => `${v.toLocaleString()} XP` }[tab];
 
   if (!entries.length) {
     return `<div class="lb-empty">No scores yet — be the first on the board!</div>`;
@@ -3460,9 +3465,9 @@ function renderLeaderboardTable(entries, tab) {
 async function openLeaderboard() {
   document.getElementById('lb-overlay').classList.remove('hidden');
   document.getElementById('lb-popup').classList.remove('hidden');
-  lbCurrentTab = 'wave';
+  lbCurrentTab = 'lifetime';
   document.querySelectorAll('.lb-tab').forEach((t,i) => {
-    t.classList.toggle('active', i === 0);
+    t.classList.toggle('active', i === 1); // default to Lifetime XP tab
   });
   await refreshLeaderboard();
   // Pre-load guild data in background
@@ -3489,7 +3494,7 @@ async function refreshLeaderboard() {
 
 async function switchLbTab(tab) {
   lbCurrentTab = tab;
-  const tabs = ['wave','xp','guilds'];
+  const tabs = ['wave','lifetime','guilds'];
   document.querySelectorAll('.lb-tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === tab));
   document.getElementById('lb-content').innerHTML = '<div class="lb-loading">⏳ Loading...</div>';
   if (tab === 'guilds') {
@@ -3517,6 +3522,7 @@ function saveGame() {
     skills:       state.skills,
     skillClicks:  state.skillClicks,
     totalXP:      state.totalXP,
+    lifetimeXP:   state.lifetimeXP,
     enemiesDefeated: state.enemiesDefeated,
     wave:         state.wave,
     shop: {
@@ -3556,6 +3562,7 @@ function loadGame() {
     Object.assign(state.skills,      data.skills      || {});
     Object.assign(state.skillClicks, data.skillClicks || {});
     state.totalXP          = data.totalXP          || 0;
+    state.lifetimeXP       = data.lifetimeXP       || state.totalXP; // fallback to totalXP for existing saves
     state.enemiesDefeated  = data.enemiesDefeated  || 0;
     state.wave             = data.wave             || 1;
 
@@ -3641,6 +3648,7 @@ function deleteSave() {
   });
 
   state.totalXP         = 0;
+  state.lifetimeXP      = 0;
   state.enemiesDefeated = 0;
   state.wave            = 1;
   state.fight.active    = false;
@@ -3750,6 +3758,7 @@ async function downloadSnapshotCSV() {
         `"${(d.name || 'Unknown').replace(/"/g,'""')}"`,
         d.skin || '',
         `"${(d.wallet || '').replace(/"/g,'""')}"`,
+        d.lifetimeXP || d.totalXP || 0,
         d.totalXP || 0,
         d.wave || 0,
         d.enemiesDefeated || 0,
@@ -3828,7 +3837,7 @@ function toggleHTP(btn) {
 
   <div class="lb-tabs">
     <button class="lb-tab active" onclick="switchLbTab('wave')">🌊 Highest Wave</button>
-    <button class="lb-tab" onclick="switchLbTab('xp')">⚡ Total XP</button>
+    <button class="lb-tab" onclick="switchLbTab('lifetime')">⚡ Lifetime XP</button>
     <button class="lb-tab" onclick="switchLbTab('guilds')">⚔ Guilds</button>
   </div>
 
